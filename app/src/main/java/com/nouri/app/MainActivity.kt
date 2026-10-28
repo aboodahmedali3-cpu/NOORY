@@ -6,29 +6,11 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -37,148 +19,106 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import com.nouri.app.guardian.DEFAULT_DISTRACTIONS
 import com.nouri.app.guardian.GuardianAccessibilityService
 import com.nouri.app.guardian.GuardianStore
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.key
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                MaterialTheme {
-                    Surface(modifier = Modifier.fillMaxSize()) {
-                        GuardianScreen()
-                    }
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    MainScreen()
                 }
             }
         }
     }
 }
 
-private fun isServiceEnabled(context: android.content.Context): Boolean {
-    val expected = ComponentName(context, GuardianAccessibilityService::class.java).flattenToString()
-    val enabled = Settings.Secure.getString(
-        context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-    ) ?: return false
-    return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
-}
-
 @Composable
-fun GuardianScreen() {
+fun MainScreen() {
     val context = LocalContext.current
-    val store = remember { GuardianStore(context) }
-
-    var serviceOn by remember { mutableStateOf(isServiceEnabled(context)) }
-    var limit by remember { mutableIntStateOf(store.dailyLimitMinutes) }
-    var focus by remember { mutableStateOf(store.focusMode) }
-    var quickLock by remember { mutableStateOf(store.isQuickLockActive()) } // حالة القفل السريع الجديدة
-    var refresh by remember { mutableIntStateOf(0) }
-
-    // أعد الفحص عند العودة من شاشة إعدادات إمكانية الوصول.
+    var isLocked by remember { mutableStateOf(GuardianStore.isLocked(context)) }
+    
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                serviceOn = isServiceEnabled(context)
-                refresh++
+                isLocked = GuardianStore.isLocked(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Text("نوري — الحارس", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = "تطبيق نوري (NOORY)",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = "حارس التركيز والحد من المشتتات",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.secondary
+        )
 
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(40.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
-                    if (serviceOn) "الحارس يعمل ✅" else "الحارس متوقف ⚠️",
+                    text = if (isLocked) "حالة القفل: مفعل 🔒" else "حالة القفل: متوقف 🔓",
                     style = MaterialTheme.typography.titleMedium
                 )
-                if (!serviceOn) {
-                    Text("فعّل «نوري» من إعدادات إمكانية الوصول ليبدأ الحجب.")
-                    Button(onClick = {
-                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    }) { Text("فتح إعدادات إمكانية الوصول") }
-                }
-            }
-        }
+                
+                Spacer(modifier = Modifier.height(16.dp))
 
-        // بطاقة القفل السريع (ميزة المرحلة الأولى الجديدة)
-        Card(Modifier.fillMaxWidth()) {
-            Row(
-                Modifier.padding(16.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("القفل السريع", style = MaterialTheme.typography.titleMedium)
-                    Text("حجب فوري لجميع المشتتات")
-                }
-                Switch(checked = quickLock, onCheckedChange = {
-                    quickLock = it
-                    store.setQuickLockActive(it)
-                })
-            }
-        }
-
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("السقف اليومي لكل تطبيق", style = MaterialTheme.typography.titleMedium)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Button(
+                    onClick = {
+                        val newState = !isLocked
+                        GuardianStore.setLocked(context, newState)
+                        isLocked = newState
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedButton(onClick = {
-                        limit = (limit - 5).coerceAtLeast(5); store.dailyLimitMinutes = limit
-                    }) { Text("−5") }
-                    Text("$limit دقيقة", style = MaterialTheme.typography.titleLarge)
-                    OutlinedButton(onClick = {
-                        limit = (limit + 5).coerceAtMost(600); store.dailyLimitMinutes = limit
-                    }) { Text("+5") }
+                    Text(text = if (isLocked) "إيقاف القفل السريع" else "تفعيل القفل السريع")
                 }
             }
         }
 
-        Card(Modifier.fillMaxWidth()) {
-            Row(
-                Modifier.padding(16.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("وضع التركيز", style = MaterialTheme.typography.titleMedium)
-                    Text("حجب كل التطبيقات المشتتة بناءً على القواعد")
-                }
-                Switch(checked = focus, onCheckedChange = {
-                    focus = it; store.focusMode = it
-                })
-            }
-        }
+        Spacer(modifier = Modifier.height(24.dp))
 
-        Text("استخدام اليوم", style = MaterialTheme.typography.titleMedium)
-        // `refresh` يجبر إعادة القراءة عند العودة للتطبيق.
-        key(refresh) {
-            DEFAULT_DISTRACTIONS.forEach { (pkg, name) ->
-                val minutes = store.usedMillisToday(pkg) / 60_000
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(name)
-                    Text("$minutes / $limit د")
-                }
-            }
+        OutlinedButton(
+            onClick = {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                context.startActivity(intent)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "تفعيل إذن خدمة الحراسة (Accessibility)")
         }
-        Spacer(Modifier.height(8.dp))
     }
 }
