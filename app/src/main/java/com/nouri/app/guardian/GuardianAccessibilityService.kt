@@ -5,12 +5,13 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
+import android.widget.Toast
 
 /**
- * خدمة الحراسة:
+ * خدمة الحراسة المحدثة:
  *  - تتتبع التطبيق المفتوح حالياً (اسم الحزمة فقط، دون قراءة محتوى الشاشة).
  *  - تحتسب مدة الاستخدام لكل تطبيق مشتت.
- *  - تعيد المستخدم للشاشة الرئيسية عند تجاوز السقف أو في وضع التركيز.
+ *  - تعيد المستخدم للشاشة الرئيسية عند تجاوز السقف، أو في وضع التركيز، أو أثناء القفل السريع أو الجلسات النشطة.
  */
 class GuardianAccessibilityService : AccessibilityService() {
 
@@ -20,14 +21,18 @@ class GuardianAccessibilityService : AccessibilityService() {
     private var currentPkg: String? = null
     private var sinceElapsed: Long = 0L
 
-    /** فحص دوري كل 5 ثوانٍ طالما تطبيق مشتت في المقدمة، لقطع الجلسة عند بلوغ السقف. */
+    /** فحص دوري كل 5 ثوانٍ طالما تطبيق مشتت في المقدمة، لقطع الجلسة عند بلوغ السقف أو تفعيل القفل. */
     private val ticker = object : Runnable {
         override fun run() {
             val pkg = currentPkg
-            if (pkg != null && pkg in DEFAULT_DISTRACTIONS) {
+            if (pkg != null) {
                 flushUsage()
-                if (store.isBlocked(pkg)) kick()
-                handler.postDelayed(this, TICK_MS)
+                if (store.isBlocked(pkg)) {
+                    kick()
+                    showBlockedToast()
+                } else {
+                    handler.postDelayed(this, TICK_MS)
+                }
             }
         }
     }
@@ -48,12 +53,11 @@ class GuardianAccessibilityService : AccessibilityService() {
         sinceElapsed = SystemClock.elapsedRealtime()
         handler.removeCallbacks(ticker)
 
-        if (pkg in DEFAULT_DISTRACTIONS) {
-            if (store.isBlocked(pkg)) {
-                kick()
-            } else {
-                handler.postDelayed(ticker, TICK_MS)
-            }
+        if (store.isBlocked(pkg)) {
+            kick()
+            showBlockedToast()
+        } else if (pkg in DEFAULT_DISTRACTIONS) {
+            handler.postDelayed(ticker, TICK_MS)
         }
     }
 
@@ -82,6 +86,10 @@ class GuardianAccessibilityService : AccessibilityService() {
         performGlobalAction(GLOBAL_ACTION_HOME)
         currentPkg = null
         handler.removeCallbacks(ticker)
+    }
+
+    private fun showBlockedToast() {
+        Toast.makeText(applicationContext, "🚫 تم حجب التطبيق بواسطة تطبيق نوري", Toast.LENGTH_SHORT).show()
     }
 
     /** نوافذ النظام (لوحة الإشعارات، لوحة المفاتيح...) لا تُعدّ تغييراً للتطبيق. */
