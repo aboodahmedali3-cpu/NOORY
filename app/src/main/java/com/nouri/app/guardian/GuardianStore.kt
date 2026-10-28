@@ -76,9 +76,7 @@ object GuardianStore {
 
     fun getDistractions(context: Context): List<String> {
         val saved = getPrefs(context).getString(KEY_DISTRACTIONS, null)
-        if (saved.isNullOrEmpty()) {
-            return DEFAULT_DISTRACTIONS
-        }
+        if (saved.isNullOrEmpty()) return DEFAULT_DISTRACTIONS
         return saved.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
@@ -171,21 +169,18 @@ object GuardianStore {
         getPrefs(context).edit().putBoolean(KEY_SCHEDULE_ENABLED, enabled).apply()
     }
 
-    fun isScheduleEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_SCHEDULE_ENABLED, false)
-    }
+    fun isScheduleEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_SCHEDULE_ENABLED, false)
 
-    fun getScheduleStartHour(context: Context): Int {
-        return getPrefs(context).getInt(KEY_SCHEDULE_START_HOUR, 22)
-    }
+    fun getScheduleStartHour(context: Context): Int =
+        getPrefs(context).getInt(KEY_SCHEDULE_START_HOUR, 22)
 
     fun setScheduleStartHour(context: Context, hour: Int) {
         getPrefs(context).edit().putInt(KEY_SCHEDULE_START_HOUR, hour.coerceIn(0, 23)).apply()
     }
 
-    fun getScheduleEndHour(context: Context): Int {
-        return getPrefs(context).getInt(KEY_SCHEDULE_END_HOUR, 7)
-    }
+    fun getScheduleEndHour(context: Context): Int =
+        getPrefs(context).getInt(KEY_SCHEDULE_END_HOUR, 7)
 
     fun setScheduleEndHour(context: Context, hour: Int) {
         getPrefs(context).edit().putInt(KEY_SCHEDULE_END_HOUR, hour.coerceIn(0, 23)).apply()
@@ -222,9 +217,8 @@ object GuardianStore {
         getPrefs(context).edit().remove(KEY_PIN_CODE).apply()
     }
 
-    fun isPinProtectionEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_PIN_PROTECTION_ENABLED, false)
-    }
+    fun isPinProtectionEnabled(context: Context): Boolean =
+        getPrefs(context).getBoolean(KEY_PIN_PROTECTION_ENABLED, false)
 
     fun setPinProtectionEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_PIN_PROTECTION_ENABLED, enabled).apply()
@@ -255,6 +249,7 @@ object GuardianStore {
     fun toggleWhitelist(context: Context, packageName: String): Boolean {
         val name = packageName.trim()
         if (name.isEmpty()) return false
+
         val current = getWhitelist(context).toMutableList()
         return if (current.any { it.equals(name, ignoreCase = true) }) {
             current.removeAll { it.equals(name, ignoreCase = true) }
