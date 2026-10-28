@@ -21,7 +21,7 @@ object GuardianStore {
     private const val KEY_DAILY_USAGE = "daily_usage_minutes"
     private const val KEY_LAST_RESET_DATE = "last_reset_date"
     private const val KEY_PACKAGE_USAGE = "package_usage_map"
-    private const val DEFAULT_DAILY_LIMIT = 5
+    private const val DEFAULT_DAILY_LIMIT = 30
 
     private fun getPrefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)

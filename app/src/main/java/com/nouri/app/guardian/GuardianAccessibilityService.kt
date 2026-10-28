@@ -1,6 +1,7 @@
 package com.nouri.app.guardian
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
@@ -10,7 +11,7 @@ import android.widget.Toast
 class GuardianAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private val checkInterval = 2000L // الفحص كل ثانيتين
+    private val checkInterval = 5000L
 
     private val monitorRunnable = object : Runnable {
         override fun run() {
@@ -33,28 +34,35 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     private fun checkCurrentApp() {
         val context = applicationContext
-        val isLocked = GuardianStore.isLocked(context)
+        val packageName = rootInActiveWindow?.packageName?.toString() ?: return
 
-        // إذا كان وضع التركيز مفعلاً أو تم تجاوز السقف اليومي
-        if (isLocked) {
-            val packageName = rootInActiveWindow?.packageName?.toString() ?: return
-            val distractions = GuardianStore.getDistractions(context)
+        if (packageName == "com.nouri.app") return
 
-            // استثناء تطبيقنا نوري وواجهات النظام الأساسية
-            if (packageName != "com.nouri.app" &&
-                !packageName.contains("launcher") &&
-                !packageName.contains("systemui") &&
-                distractions.any { packageName.contains(it) }) {
+        val focusEnabled = GuardianStore.isLocked(context)
+        val dailyLimitReached = GuardianStore.isDailyLimitReached(context)
 
-                // إرجاع المستخدم فوراً للشاشة الرئيسية
-                val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_HOME)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                startActivity(homeIntent)
+        if (!focusEnabled && !dailyLimitReached) return
 
-                Toast.makeText(context, "محظور! حافظ على تركيزك يا بطل 📚", Toast.LENGTH_SHORT).show()
-            }
+        if (!isDistractionApp(context, packageName)) return
+
+        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(homeIntent)
+
+        GuardianStore.recordPackageUsage(context, packageName, 1)
+        Toast.makeText(context, "محظور! حافظ على تركيزك يا بطل 📚", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun isDistractionApp(context: Context, packageName: String): Boolean {
+        val target = packageName.trim()
+        if (target.isEmpty()) return false
+
+        return GuardianStore.getDistractions(context).any { distraction ->
+            distraction.equals(target, ignoreCase = true) ||
+                target.contains(distraction, ignoreCase = true) ||
+                distraction.contains(target, ignoreCase = true)
         }
     }
 
