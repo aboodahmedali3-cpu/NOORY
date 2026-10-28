@@ -1,6 +1,5 @@
 package com.nouri.app
 
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -43,12 +42,14 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
     val context = LocalContext.current
     var isLocked by remember { mutableStateOf(GuardianStore.isLocked(context)) }
-    
+    var dailyLimit by remember { mutableStateOf(GuardianStore.getDailyLimit(context)) }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isLocked = GuardianStore.isLocked(context)
+                dailyLimit = GuardianStore.getDailyLimit(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -60,65 +61,136 @@ fun MainScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(16.dp)
             .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "تطبيق نوري (NOORY)",
+            text = "نوري – الحارس",
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = "حارس التركيز والحد من المشتتات",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.secondary
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(vertical = 16.dp)
         )
 
-        Spacer(modifier = Modifier.height(40.dp))
-
+        // بطاقة تنبيه إمكانية الوصول
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isLocked) "حالة القفل: مفعل 🔒" else "حالة القفل: متوقف 🔓",
-                    style = MaterialTheme.typography.titleMedium
+                    text = "الحارس متوقف ⚠️",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
                 )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "فعّل «نوري» من إعدادات إمكانية الوصول ليبدأ الحجب.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = {
-                        val newState = !isLocked
-                        GuardianStore.setLocked(context, newState)
-                        isLocked = newState
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        context.startActivity(intent)
+                    }
                 ) {
-                    Text(text = if (isLocked) "إيقاف القفل السريع" else "تفعيل القفل السريع")
+                    Text(text = "فتح إعدادات إمكانية الوصول")
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        OutlinedButton(
-            onClick = {
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                context.startActivity(intent)
-            },
-            modifier = Modifier.fillMaxWidth()
+        // بطاقة السقف اليومي
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         ) {
-            Text(text = "تفعيل إذن خدمة الحراسة (Accessibility)")
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "السقف اليومي لكل تطبيق",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Button(onClick = {
+                        if (dailyLimit > 5) {
+                            dailyLimit -= 5
+                            GuardianStore.setDailyLimit(context, dailyLimit)
+                        }
+                    }) {
+                        Text(text = "5-")
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = "$dailyLimit دقيقة",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Button(onClick = {
+                        dailyLimit += 5
+                        GuardianStore.setDailyLimit(context, dailyLimit)
+                    }) {
+                        Text(text = "5+")
+                    }
+                }
+            }
+        }
+
+        // بطاقة وضع التركيز
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "وضع التركيز",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "حجب كل التطبيقات المشتتة الآن",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(
+                    checked = isLocked,
+                    onCheckedChange = { newState ->
+                        GuardianStore.setLocked(context, newState)
+                        isLocked = newState
+                    }
+                )
+            }
+        }
+
+        // قسم استخدام اليوم
+        Text(
+            text = "استخدام اليوم",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.End).padding(vertical = 8.dp)
+        )
+
+        val apps = listOf("واتساب", "يوتيوب", "تيك توك", "تلجرام", "فيسبوك", "إنستجرام")
+        apps.forEach { appName ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = appName)
+                Text(text = "د 0 / $dailyLimit")
+            }
         }
     }
 }
