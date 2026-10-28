@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +67,10 @@ fun MainScreen() {
     var dailyLimit by remember(context) { mutableIntStateOf(GuardianStore.getDailyLimit(context)) }
     var dailyUsage by remember(context) { mutableIntStateOf(GuardianStore.getDailyUsage(context)) }
     var sessionDuration by remember(context) { mutableIntStateOf(GuardianStore.getSessionDuration(context)) }
+    var scheduleEnabled by remember(context) { mutableStateOf(GuardianStore.isScheduleEnabled(context)) }
+    var scheduleStartHour by remember(context) { mutableIntStateOf(GuardianStore.getScheduleStartHour(context)) }
+    var scheduleEndHour by remember(context) { mutableIntStateOf(GuardianStore.getScheduleEndHour(context)) }
+    val weeklyUsage by remember(context) { mutableStateOf(GuardianStore.getWeeklyUsageHistory(context)) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, context) {
@@ -77,6 +81,9 @@ fun MainScreen() {
                 dailyLimit = GuardianStore.getDailyLimit(context)
                 dailyUsage = GuardianStore.getDailyUsage(context)
                 sessionDuration = GuardianStore.getSessionDuration(context)
+                scheduleEnabled = GuardianStore.isScheduleEnabled(context)
+                scheduleStartHour = GuardianStore.getScheduleStartHour(context)
+                scheduleEndHour = GuardianStore.getScheduleEndHour(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -95,6 +102,8 @@ fun MainScreen() {
         "org.telegram.messenger" to "تيليجرام",
         "com.android.chrome" to "كروم"
     )
+    val maxWeekValue = (weeklyUsage.maxOrNull() ?: 1).coerceAtLeast(1)
+    val weekLabels = listOf("الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")
 
     Box(
         modifier = Modifier
@@ -188,6 +197,65 @@ fun MainScreen() {
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                         }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "جدولة الحظر",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        listOf(
+                            "22:00 - 07:00" to Pair(22, 7),
+                            "21:00 - 09:00" to Pair(21, 9),
+                            "08:00 - 18:00" to Pair(8, 18),
+                            "23:00 - 06:00" to Pair(23, 6)
+                        ).forEach { (label, pair) ->
+                            Button(
+                                onClick = {
+                                    scheduleStartHour = pair.first
+                                    scheduleEndHour = pair.second
+                                    GuardianStore.setScheduleWindow(context, pair.first, pair.second)
+                                    scheduleEnabled = true
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(text = label, maxLines = 1)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "تفعيل الجدولة")
+                        Switch(
+                            checked = scheduleEnabled,
+                            onCheckedChange = { enabled ->
+                                scheduleEnabled = enabled
+                                GuardianStore.setScheduleEnabled(context, enabled)
+                            }
+                        )
+                    }
+                    if (scheduleEnabled) {
+                        Text(
+                            text = "النطاق الحالي: ${scheduleStartHour}:00 - ${scheduleEndHour}:00",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -303,6 +371,58 @@ fun MainScreen() {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
+                        text = "إحصاءات الأسبوع",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(140.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        weeklyUsage.forEachIndexed { index, value ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Bottom,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(18.dp)
+                                        .fillMaxHeight(
+                                            fraction = (value.toFloat() / maxWeekValue.toFloat()).coerceIn(0f, 1f)
+                                        )
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)),
+                                    contentAlignment = Alignment.BottomCenter
+                                ) {
+                                    if (value > 0) {
+                                        Text(
+                                            text = value.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = weekLabels[index],
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
                         text = "التطبيقات المشتتة",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
@@ -332,7 +452,7 @@ fun MainScreen() {
                             }
                             Switch(
                                 checked = isBlocked,
-                                onCheckedChange = { enabled ->
+                                onCheckedChange = {
                                     GuardianStore.toggleDistraction(context, packageName)
                                 }
                             )

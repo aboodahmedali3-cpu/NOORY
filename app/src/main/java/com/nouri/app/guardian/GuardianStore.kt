@@ -3,6 +3,7 @@ package com.nouri.app.guardian
 import android.content.Context
 import android.content.SharedPreferences
 import java.time.LocalDate
+import java.time.LocalTime
 
 val DEFAULT_DISTRACTIONS = listOf(
     "com.instagram.android",
@@ -26,6 +27,10 @@ object GuardianStore {
     private const val KEY_LAST_RESET_DATE = "last_reset_date"
     private const val KEY_PACKAGE_USAGE = "package_usage_map"
     private const val KEY_BLOCKED_APP = "last_blocked_app"
+    private const val KEY_WEEKLY_HISTORY = "weekly_usage_history"
+    private const val KEY_SCHEDULE_ENABLED = "schedule_enabled"
+    private const val KEY_SCHEDULE_START_HOUR = "schedule_start_hour"
+    private const val KEY_SCHEDULE_END_HOUR = "schedule_end_hour"
     private const val DEFAULT_DAILY_LIMIT = 30
     private const val DEFAULT_SESSION_DURATION = 30
 
@@ -149,12 +154,75 @@ object GuardianStore {
         return getPrefs(context).getString(KEY_BLOCKED_APP, "") ?: ""
     }
 
+    fun getWeeklyUsageHistory(context: Context): List<Int> {
+        val raw = getPrefs(context).getString(KEY_WEEKLY_HISTORY, "") ?: ""
+        if (raw.isBlank()) return listOf(0, 0, 0, 0, 0, 0, 0)
+
+        return raw.split(",")
+            .map { it.trim().toIntOrNull() ?: 0 }
+            .takeIf { it.size == 7 }
+            ?: listOf(0, 0, 0, 0, 0, 0, 0)
+    }
+
+    fun setScheduleEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SCHEDULE_ENABLED, enabled).apply()
+    }
+
+    fun isScheduleEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SCHEDULE_ENABLED, false)
+    }
+
+    fun getScheduleStartHour(context: Context): Int {
+        return getPrefs(context).getInt(KEY_SCHEDULE_START_HOUR, 22)
+    }
+
+    fun setScheduleStartHour(context: Context, hour: Int) {
+        getPrefs(context).edit().putInt(KEY_SCHEDULE_START_HOUR, hour.coerceIn(0, 23)).apply()
+    }
+
+    fun getScheduleEndHour(context: Context): Int {
+        return getPrefs(context).getInt(KEY_SCHEDULE_END_HOUR, 7)
+    }
+
+    fun setScheduleEndHour(context: Context, hour: Int) {
+        getPrefs(context).edit().putInt(KEY_SCHEDULE_END_HOUR, hour.coerceIn(0, 23)).apply()
+    }
+
+    fun setScheduleWindow(context: Context, startHour: Int, endHour: Int) {
+        setScheduleStartHour(context, startHour)
+        setScheduleEndHour(context, endHour)
+        setScheduleEnabled(context, true)
+    }
+
+    fun isScheduledFocusActive(context: Context): Boolean {
+        if (!isScheduleEnabled(context)) return false
+
+        val now = LocalTime.now()
+        val currentMinutes = now.hour * 60 + now.minute
+        val startMinutes = getScheduleStartHour(context) * 60
+        val endMinutes = getScheduleEndHour(context) * 60
+
+        return if (endMinutes >= startMinutes) {
+            currentMinutes >= startMinutes && currentMinutes < endMinutes
+        } else {
+            currentMinutes >= startMinutes || currentMinutes < endMinutes
+        }
+    }
+
     private fun resetIfNeeded(context: Context) {
         val prefs = getPrefs(context)
         val today = LocalDate.now().toString()
         val lastResetDate = prefs.getString(KEY_LAST_RESET_DATE, null)
 
         if (lastResetDate != today) {
+            val previousDailyUsage = prefs.getInt(KEY_DAILY_USAGE, 0)
+            val weekly = getWeeklyUsageHistory(context).toMutableList().ifEmpty { MutableList(7) { 0 } }
+            if (weekly.size == 7) {
+                weekly.removeAt(0)
+                weekly.add(previousDailyUsage)
+                prefs.edit().putString(KEY_WEEKLY_HISTORY, weekly.joinToString(",")).apply()
+            }
+
             prefs.edit()
                 .putString(KEY_LAST_RESET_DATE, today)
                 .putInt(KEY_DAILY_USAGE, 0)

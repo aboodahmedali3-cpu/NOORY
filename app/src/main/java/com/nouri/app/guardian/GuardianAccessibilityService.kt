@@ -40,8 +40,9 @@ class GuardianAccessibilityService : AccessibilityService() {
 
         val focusEnabled = GuardianStore.isLocked(context)
         val dailyLimitReached = GuardianStore.isDailyLimitReached(context)
+        val scheduledFocusActive = GuardianStore.isScheduledFocusActive(context)
 
-        if (!focusEnabled && !dailyLimitReached) return
+        if (!focusEnabled && !dailyLimitReached && !scheduledFocusActive) return
         if (!isDistractionApp(context, packageName)) return
 
         val homeIntent = Intent(Intent.ACTION_MAIN).apply {
