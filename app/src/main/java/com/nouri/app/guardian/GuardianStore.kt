@@ -2,8 +2,6 @@ package com.nouri.app.guardian
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 
 val DEFAULT_DISTRACTIONS = listOf(
     "com.instagram.android",
@@ -31,7 +29,7 @@ object GuardianStore {
     }
 
     fun getDailyLimit(context: Context): Int {
-        return getPrefs(context).getInt(KEY_DAILY_LIMIT, 60) // افتراضاً 60 دقيقة
+        return getPrefs(context).getInt(KEY_DAILY_LIMIT, 60)
     }
 
     fun setDailyLimit(context: Context, minutes: Int) {
@@ -39,12 +37,15 @@ object GuardianStore {
     }
 
     fun getDistractions(context: Context): List<String> {
-        val json = getPrefs(context).getString(KEY_DISTRACTIONS, null) ?: return DEFAULT_DISTRACTIONS
-        val type = object : TypeToken<List<String>>() {}.type
-        return try {
-            Gson().fromJson(json, type) ?: DEFAULT_DISTRACTIONS
-        } catch (e: Exception) {
-            DEFAULT_DISTRACTIONS
+        val saved = getPrefs(context).getString(KEY_DISTRACTIONS, null)
+        if (saved.isNullOrEmpty()) {
+            return DEFAULT_DISTRACTIONS
         }
+        return saved.split(",")
+    }
+
+    fun setDistractions(context: Context, list: List<String>) {
+        val joined = list.joinToString(",")
+        getPrefs(context).edit().putString(KEY_DISTRACTIONS, joined).apply()
     }
 }
