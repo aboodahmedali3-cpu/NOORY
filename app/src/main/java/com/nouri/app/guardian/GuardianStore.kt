@@ -10,18 +10,24 @@ val DEFAULT_DISTRACTIONS = listOf(
     "com.zhiliaoapp.musically",
     "com.google.android.youtube",
     "com.whatsapp",
-    "com.telegram.messenger"
+    "org.telegram.messenger",
+    "com.telegram.messenger",
+    "com.android.chrome"
 )
 
 object GuardianStore {
     private const val PREF_NAME = "nouri_guardian_prefs"
     private const val KEY_IS_LOCKED = "is_locked"
+    private const val KEY_LOCKED_MODE = "locked_mode"
     private const val KEY_DAILY_LIMIT = "daily_limit_minutes"
+    private const val KEY_SESSION_DURATION = "session_duration_minutes"
     private const val KEY_DISTRACTIONS = "distractions_list"
     private const val KEY_DAILY_USAGE = "daily_usage_minutes"
     private const val KEY_LAST_RESET_DATE = "last_reset_date"
     private const val KEY_PACKAGE_USAGE = "package_usage_map"
+    private const val KEY_BLOCKED_APP = "last_blocked_app"
     private const val DEFAULT_DAILY_LIMIT = 30
+    private const val DEFAULT_SESSION_DURATION = 30
 
     private fun getPrefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -35,14 +41,29 @@ object GuardianStore {
         getPrefs(context).edit().putBoolean(KEY_IS_LOCKED, locked).apply()
     }
 
+    fun isLockedMode(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_LOCKED_MODE, false)
+    }
+
+    fun setLockedMode(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_LOCKED_MODE, enabled).apply()
+    }
+
     fun getDailyLimit(context: Context): Int {
         resetIfNeeded(context)
         return getPrefs(context).getInt(KEY_DAILY_LIMIT, DEFAULT_DAILY_LIMIT).coerceAtLeast(0)
     }
 
     fun setDailyLimit(context: Context, minutes: Int) {
-        val safeMinutes = minutes.coerceAtLeast(0)
-        getPrefs(context).edit().putInt(KEY_DAILY_LIMIT, safeMinutes).apply()
+        getPrefs(context).edit().putInt(KEY_DAILY_LIMIT, minutes.coerceAtLeast(0)).apply()
+    }
+
+    fun getSessionDuration(context: Context): Int {
+        return getPrefs(context).getInt(KEY_SESSION_DURATION, DEFAULT_SESSION_DURATION).coerceAtLeast(5)
+    }
+
+    fun setSessionDuration(context: Context, minutes: Int) {
+        getPrefs(context).edit().putInt(KEY_SESSION_DURATION, minutes.coerceAtLeast(5)).apply()
     }
 
     fun getDistractions(context: Context): List<String> {
@@ -54,8 +75,24 @@ object GuardianStore {
     }
 
     fun setDistractions(context: Context, list: List<String>) {
-        val joined = list.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(",")
+        val joined = list.map { it.trim() }.filter { it.isNotEmpty() }.distinct().joinToString(",")
         getPrefs(context).edit().putString(KEY_DISTRACTIONS, joined).apply()
+    }
+
+    fun toggleDistraction(context: Context, packageName: String): Boolean {
+        val safeName = packageName.trim()
+        if (safeName.isEmpty()) return false
+
+        val current = getDistractions(context).toMutableList()
+        if (current.any { it.equals(safeName, ignoreCase = true) }) {
+            current.removeAll { it.equals(safeName, ignoreCase = true) }
+            setDistractions(context, current)
+            return false
+        }
+
+        current.add(safeName)
+        setDistractions(context, current)
+        return true
     }
 
     fun getDailyUsage(context: Context): Int {
@@ -64,8 +101,7 @@ object GuardianStore {
     }
 
     fun setDailyUsage(context: Context, minutes: Int) {
-        val safeMinutes = minutes.coerceAtLeast(0)
-        getPrefs(context).edit().putInt(KEY_DAILY_USAGE, safeMinutes).apply()
+        getPrefs(context).edit().putInt(KEY_DAILY_USAGE, minutes.coerceAtLeast(0)).apply()
     }
 
     fun addDailyUsage(context: Context, minutes: Int) {
@@ -102,6 +138,15 @@ object GuardianStore {
         val current = getPackageUsage(context, adjustedPackage)
         setPackageUsage(context, adjustedPackage, current + safeMinutes)
         addDailyUsage(context, safeMinutes)
+    }
+
+    fun setLastBlockedApp(context: Context, packageName: String) {
+        if (packageName.isBlank()) return
+        getPrefs(context).edit().putString(KEY_BLOCKED_APP, packageName.trim()).apply()
+    }
+
+    fun getLastBlockedApp(context: Context): String {
+        return getPrefs(context).getString(KEY_BLOCKED_APP, "") ?: ""
     }
 
     private fun resetIfNeeded(context: Context) {
@@ -142,3 +187,4 @@ object GuardianStore {
             .joinToString(";") { "${it.key}=${it.value}" }
     }
 }
+

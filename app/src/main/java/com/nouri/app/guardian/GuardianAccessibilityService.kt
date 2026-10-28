@@ -11,7 +11,7 @@ import android.widget.Toast
 class GuardianAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private val checkInterval = 5000L
+    private val checkInterval = 3000L
 
     private val monitorRunnable = object : Runnable {
         override fun run() {
@@ -22,7 +22,7 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Toast.makeText(this, "خدمة حراسة نوري تعمل بذكاء 🛡️", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "خدمة نوري للحظر تعمل بنجاح 🛡️", Toast.LENGTH_SHORT).show()
         handler.post(monitorRunnable)
     }
 
@@ -42,17 +42,18 @@ class GuardianAccessibilityService : AccessibilityService() {
         val dailyLimitReached = GuardianStore.isDailyLimitReached(context)
 
         if (!focusEnabled && !dailyLimitReached) return
-
         if (!isDistractionApp(context, packageName)) return
 
         val homeIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_HOME)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
-        startActivity(homeIntent)
 
+        startActivity(homeIntent)
+        GuardianStore.setLastBlockedApp(context, packageName)
         GuardianStore.recordPackageUsage(context, packageName, 1)
-        Toast.makeText(context, "محظور! حافظ على تركيزك يا بطل 📚", Toast.LENGTH_SHORT).show()
+
+        Toast.makeText(context, "محظور بسبب جلسة التركيز 🔒", Toast.LENGTH_SHORT).show()
     }
 
     private fun isDistractionApp(context: Context, packageName: String): Boolean {
@@ -66,10 +67,11 @@ class GuardianAccessibilityService : AccessibilityService() {
         }
     }
 
-    override fun onInterrupt() {}
+    override fun onInterrupt() = Unit
 
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(monitorRunnable)
     }
 }
+
