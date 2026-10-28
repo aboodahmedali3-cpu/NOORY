@@ -7,7 +7,9 @@ val DEFAULT_DISTRACTIONS = listOf(
     "com.instagram.android",
     "com.facebook.katana",
     "com.zhiliaoapp.musically", // TikTok
-    "com.google.android.youtube"
+    "com.google.android.youtube",
+    "com.whatsapp",
+    "com.telegram.messenger"
 )
 
 object GuardianStore {
@@ -29,7 +31,7 @@ object GuardianStore {
     }
 
     fun getDailyLimit(context: Context): Int {
-        return getPrefs(context).getInt(KEY_DAILY_LIMIT, 60)
+        return getPrefs(context).getInt(KEY_DAILY_LIMIT, 5) // الافتراضي 5 دقائق كما ظهر في تصميمك
     }
 
     fun setDailyLimit(context: Context, minutes: Int) {
