@@ -4,15 +4,13 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
-import com.nouri.app.MainActivity
 
 class GuardianAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private val checkInterval = 3000L // كل 3 ثوانٍ
+    private val checkInterval = 2000L // الفحص كل ثانيتين
 
     private val monitorRunnable = object : Runnable {
         override fun run() {
@@ -23,7 +21,7 @@ class GuardianAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Toast.makeText(this, "خدمة الحراسة لنوري تعمل بنجاح", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "خدمة حراسة نوري تعمل بذكاء 🛡️", Toast.LENGTH_SHORT).show()
         handler.post(monitorRunnable)
     }
 
@@ -37,24 +35,25 @@ class GuardianAccessibilityService : AccessibilityService() {
         val context = applicationContext
         val isLocked = GuardianStore.isLocked(context)
 
+        // إذا كان وضع التركيز مفعلاً أو تم تجاوز السقف اليومي
         if (isLocked) {
             val packageName = rootInActiveWindow?.packageName?.toString() ?: return
             val distractions = GuardianStore.getDistractions(context)
 
-            // استثناء حزمة التطبيق نفسه وواجهات النظام
-            if (packageName != "com.nouri.app" && 
-                !packageName.contains("launcher") && 
-                !packageName.contains("systemui") && 
-                distractions.contains(packageName)) {
-                
-                // إعادة المستخدم إلى الشاشة الرئيسية للهاتف فوراً
+            // استثناء تطبيقنا نوري وواجهات النظام الأساسية
+            if (packageName != "com.nouri.app" &&
+                !packageName.contains("launcher") &&
+                !packageName.contains("systemui") &&
+                distractions.any { packageName.contains(it) }) {
+
+                // إرجاع المستخدم فوراً للشاشة الرئيسية
                 val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                     addCategory(Intent.CATEGORY_HOME)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 startActivity(homeIntent)
-                
-                Toast.makeText(context, "ممنوع! التطبيق محجوب حالياً بواسطة نوري 🛡️", Toast.LENGTH_SHORT).show()
+
+                Toast.makeText(context, "محظور! حافظ على تركيزك يا بطل 📚", Toast.LENGTH_SHORT).show()
             }
         }
     }
