@@ -76,6 +76,7 @@ fun GuardianScreen() {
     var serviceOn by remember { mutableStateOf(isServiceEnabled(context)) }
     var limit by remember { mutableIntStateOf(store.dailyLimitMinutes) }
     var focus by remember { mutableStateOf(store.focusMode) }
+    var quickLock by remember { mutableStateOf(store.isQuickLockActive()) } // حالة القفل السريع الجديدة
     var refresh by remember { mutableIntStateOf(0) }
 
     // أعد الفحص عند العودة من شاشة إعدادات إمكانية الوصول.
@@ -115,6 +116,24 @@ fun GuardianScreen() {
             }
         }
 
+        // بطاقة القفل السريع (ميزة المرحلة الأولى الجديدة)
+        Card(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.padding(16.dp).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("القفل السريع", style = MaterialTheme.typography.titleMedium)
+                    Text("حجب فوري لجميع المشتتات")
+                }
+                Switch(checked = quickLock, onCheckedChange = {
+                    quickLock = it
+                    store.setQuickLockActive(it)
+                })
+            }
+        }
+
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("السقف اليومي لكل تطبيق", style = MaterialTheme.typography.titleMedium)
@@ -141,7 +160,7 @@ fun GuardianScreen() {
             ) {
                 Column {
                     Text("وضع التركيز", style = MaterialTheme.typography.titleMedium)
-                    Text("حجب كل التطبيقات المشتتة الآن")
+                    Text("حجب كل التطبيقات المشتتة بناءً على القواعد")
                 }
                 Switch(checked = focus, onCheckedChange = {
                     focus = it; store.focusMode = it
