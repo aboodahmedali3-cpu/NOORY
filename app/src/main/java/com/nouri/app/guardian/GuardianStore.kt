@@ -31,6 +31,9 @@ object GuardianStore {
     private const val KEY_SCHEDULE_ENABLED = "schedule_enabled"
     private const val KEY_SCHEDULE_START_HOUR = "schedule_start_hour"
     private const val KEY_SCHEDULE_END_HOUR = "schedule_end_hour"
+    private const val KEY_PIN_CODE = "pin_code"
+    private const val KEY_PIN_PROTECTION_ENABLED = "pin_protection_enabled"
+    private const val KEY_WHITELIST = "whitelist_packages"
     private const val DEFAULT_DAILY_LIMIT = 30
     private const val DEFAULT_SESSION_DURATION = 30
 
@@ -206,6 +209,61 @@ object GuardianStore {
             currentMinutes >= startMinutes && currentMinutes < endMinutes
         } else {
             currentMinutes >= startMinutes || currentMinutes < endMinutes
+        }
+    }
+
+    fun setPinCode(context: Context, pin: String) {
+        val normalized = pin.trim()
+        if (normalized.length !in 4..6) return
+        getPrefs(context).edit().putString(KEY_PIN_CODE, normalized).apply()
+    }
+
+    fun clearPinCode(context: Context) {
+        getPrefs(context).edit().remove(KEY_PIN_CODE).apply()
+    }
+
+    fun isPinProtectionEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_PIN_PROTECTION_ENABLED, false)
+    }
+
+    fun setPinProtectionEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_PIN_PROTECTION_ENABLED, enabled).apply()
+    }
+
+    fun verifyPin(context: Context, input: String): Boolean {
+        val saved = getPrefs(context).getString(KEY_PIN_CODE, "") ?: ""
+        return saved.isNotBlank() && saved == input.trim()
+    }
+
+    fun isPackageWhitelisted(context: Context, packageName: String): Boolean {
+        val target = packageName.trim()
+        if (target.isEmpty()) return false
+        return getWhitelist(context).any { it.equals(target, ignoreCase = true) }
+    }
+
+    fun getWhitelist(context: Context): List<String> {
+        val raw = getPrefs(context).getString(KEY_WHITELIST, "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    fun setWhitelist(context: Context, list: List<String>) {
+        val clean = list.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        getPrefs(context).edit().putString(KEY_WHITELIST, clean.joinToString(",")).apply()
+    }
+
+    fun toggleWhitelist(context: Context, packageName: String): Boolean {
+        val name = packageName.trim()
+        if (name.isEmpty()) return false
+        val current = getWhitelist(context).toMutableList()
+        return if (current.any { it.equals(name, ignoreCase = true) }) {
+            current.removeAll { it.equals(name, ignoreCase = true) }
+            setWhitelist(context, current)
+            false
+        } else {
+            current.add(name)
+            setWhitelist(context, current)
+            true
         }
     }
 

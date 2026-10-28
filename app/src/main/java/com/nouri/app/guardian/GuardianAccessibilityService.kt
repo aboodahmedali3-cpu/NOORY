@@ -37,6 +37,7 @@ class GuardianAccessibilityService : AccessibilityService() {
         val packageName = rootInActiveWindow?.packageName?.toString() ?: return
 
         if (packageName == "com.nouri.app") return
+        if (GuardianStore.isPackageWhitelisted(context, packageName)) return
 
         val focusEnabled = GuardianStore.isLocked(context)
         val dailyLimitReached = GuardianStore.isDailyLimitReached(context)

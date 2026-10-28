@@ -19,14 +19,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +67,7 @@ fun MainScreen() {
     val context = LocalContext.current
     var isLocked by remember(context) { mutableStateOf(GuardianStore.isLocked(context)) }
     var isLockedMode by remember(context) { mutableStateOf(GuardianStore.isLockedMode(context)) }
+    var pinProtectionEnabled by remember(context) { mutableStateOf(GuardianStore.isPinProtectionEnabled(context)) }
     var dailyLimit by remember(context) { mutableIntStateOf(GuardianStore.getDailyLimit(context)) }
     var dailyUsage by remember(context) { mutableIntStateOf(GuardianStore.getDailyUsage(context)) }
     var sessionDuration by remember(context) { mutableIntStateOf(GuardianStore.getSessionDuration(context)) }
@@ -71,6 +75,8 @@ fun MainScreen() {
     var scheduleStartHour by remember(context) { mutableIntStateOf(GuardianStore.getScheduleStartHour(context)) }
     var scheduleEndHour by remember(context) { mutableIntStateOf(GuardianStore.getScheduleEndHour(context)) }
     val weeklyUsage by remember(context) { mutableStateOf(GuardianStore.getWeeklyUsageHistory(context)) }
+    var pinInput by remember { mutableStateOf("") }
+    var pinDialogOpen by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, context) {
@@ -78,6 +84,7 @@ fun MainScreen() {
             if (event == Lifecycle.Event.ON_RESUME) {
                 isLocked = GuardianStore.isLocked(context)
                 isLockedMode = GuardianStore.isLockedMode(context)
+                pinProtectionEnabled = GuardianStore.isPinProtectionEnabled(context)
                 dailyLimit = GuardianStore.getDailyLimit(context)
                 dailyUsage = GuardianStore.getDailyUsage(context)
                 sessionDuration = GuardianStore.getSessionDuration(context)
@@ -104,6 +111,46 @@ fun MainScreen() {
     )
     val maxWeekValue = (weeklyUsage.maxOrNull() ?: 1).coerceAtLeast(1)
     val weekLabels = listOf("الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")
+
+    if (pinDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { pinDialogOpen = false; pinInput = "" },
+            title = { Text("إلغاء قفل الحظر") },
+            text = {
+                Column {
+                    Text("أدخل الرقم السري لإلغاء الحظر")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = { pinInput = it.filter { ch -> ch.isDigit() }.take(6) },
+                        singleLine = true,
+                        placeholder = { Text("1234") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (GuardianStore.verifyPin(context, pinInput)) {
+                            GuardianStore.setLocked(context, false)
+                            isLocked = false
+                            pinDialogOpen = false
+                            pinInput = ""
+                        } else {
+                            pinInput = ""
+                        }
+                    }
+                ) {
+                    Text("تأكيد")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pinDialogOpen = false; pinInput = "" }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -155,16 +202,30 @@ fun MainScreen() {
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                            context.startActivity(intent)
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(text = "فتح إعدادات إمكانية الوصول")
+                        Button(
+                            onClick = {
+                                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                context.startActivity(intent)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(text = "فتح إعدادات إمكانية الوصول")
+                        }
+                        if (isLocked && pinProtectionEnabled) {
+                            Button(
+                                onClick = { pinDialogOpen = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Text(text = "إلغاء الحظر")
+                            }
+                        }
                     }
                 }
             }
@@ -256,6 +317,46 @@ fun MainScreen() {
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "إعدادات الحماية",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "حماية بالكود")
+                        Switch(
+                            checked = pinProtectionEnabled,
+                            onCheckedChange = { enabled ->
+                                pinProtectionEnabled = enabled
+                                GuardianStore.setPinProtectionEnabled(context, enabled)
+                                if (enabled && GuardianStore.verifyPin(context, "")) {
+                                    // Intentionally no-op; caller can set PIN later through app settings.
+                                }
+                            }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            val currentPin = GuardianStore.getWhitelist(context).joinToString()
+                            val nextPin = if (currentPin.isBlank()) "1234" else currentPin
+                            GuardianStore.setPinCode(context, nextPin)
+                        }
+                    ) {
+                        Text("تعيين PIN 1234")
                     }
                 }
             }
@@ -434,6 +535,7 @@ fun MainScreen() {
                         val isBlocked = GuardianStore.getDistractions(context).any {
                             it.equals(packageName, ignoreCase = true)
                         }
+                        val isWhitelisted = GuardianStore.isPackageWhitelisted(context, packageName)
 
                         Row(
                             modifier = Modifier
@@ -445,17 +547,29 @@ fun MainScreen() {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(text = appName)
                                 Text(
-                                    text = "استخدام: $usage دقيقة",
+                                    text = "استخ��ام: $usage دقيقة",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Switch(
-                                checked = isBlocked,
-                                onCheckedChange = {
-                                    GuardianStore.toggleDistraction(context, packageName)
-                                }
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(text = if (isWhitelisted) "مسموح" else "محظور")
+                                Switch(
+                                    checked = isBlocked,
+                                    onCheckedChange = {
+                                        GuardianStore.toggleDistraction(context, packageName)
+                                    }
+                                )
+                                Switch(
+                                    checked = isWhitelisted,
+                                    onCheckedChange = {
+                                        GuardianStore.toggleWhitelist(context, packageName)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
