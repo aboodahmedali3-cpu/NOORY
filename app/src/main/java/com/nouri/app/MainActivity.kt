@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
     val context = LocalContext.current
     var isLocked by remember(context) { mutableStateOf(GuardianStore.isLocked(context)) }
+    var isLockedMode by remember(context) { mutableStateOf(GuardianStore.isLockedMode(context)) }
     var dailyLimit by remember(context) { mutableIntStateOf(GuardianStore.getDailyLimit(context)) }
     var dailyUsage by remember(context) { mutableIntStateOf(GuardianStore.getDailyUsage(context)) }
 
@@ -65,6 +66,7 @@ fun MainScreen() {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isLocked = GuardianStore.isLocked(context)
+                isLockedMode = GuardianStore.isLockedMode(context)
                 dailyLimit = GuardianStore.getDailyLimit(context)
                 dailyUsage = GuardianStore.getDailyUsage(context)
             }
@@ -100,9 +102,7 @@ fun MainScreen() {
 
         Card(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -138,7 +138,7 @@ fun MainScreen() {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "السقف اليومي لكل تطبيق",
+                    text = "الحد اليومي",
                     style = MaterialTheme.typography.titleMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -200,6 +200,36 @@ fun MainScreen() {
                     onCheckedChange = { newState ->
                         GuardianStore.setLocked(context, newState)
                         isLocked = newState
+                    }
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Locked Mode",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "منع إيقاف الحظر بسهولة",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(
+                    checked = isLockedMode,
+                    onCheckedChange = { newState ->
+                        GuardianStore.setLockedMode(context, newState)
+                        isLockedMode = newState
                     }
                 )
             }
